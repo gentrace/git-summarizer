@@ -1,0 +1,74 @@
+name: Create Release PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. v1.0.0)"
+        required: true
+        type: string
+      branch:
+        description: "Branch to create release from"
+        required: true
+        default: "main"
+        type: string
+
+jobs:
+  create-release-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+
+      - name: Create Release Branch
+        run: |
+          git checkout -b release/${{ github.event.inputs.version }}
+
+      - name: Update Version References
+        run: |
+          # Only attempt to update if the version pattern exists
+          if grep -q "git-summarizer@v[0-9]" README.md; then
+            sed -i "s/git-summarizer@v[0-9]*/git-summarizer@${{ github.event.inputs.version }}/" README.md
+          fi
+
+          # Stage changes (only if there are any)
+          if git diff --quiet; then
+            echo "No version references needed updating"
+          else
+            git config user.name "GitHub Actions"
+            git config user.email "actions@github.com"
+            git add README.md
+            git commit -m "chore: prepare release ${{ github.event.inputs.version }}"
+          fi
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git push origin release/${{ github.event.inputs.version }}
+
+          # Create PR using gh cli
+          gh pr create \
+            --title "Release ${{ github.event.inputs.version }}" \
+            --body "This PR prepares for release ${{ github.event.inputs.version }}
+
+          ## Changes
+          - Will create release tag when merged
+
+          After merging this PR:
+          1. A GitHub Release will be created
+          2. The action will be available at \`gentrace/git-summarizer@${{ github.event.inputs.version }}\`" \
+            --base main \
+            --head release/${{ github.event.inputs.version }} \
+            --label "release"
+
+      - name: Create Draft Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create ${{ github.event.inputs.version }} \
+            --draft \
+            --title "Release ${{ github.event.inputs.version }}" \
+            --notes "Draft release for ${{ github.event.inputs.version }}"

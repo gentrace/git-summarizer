@@ -1,0 +1,40 @@
+name: Publish Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  publish-release:
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get version from branch
+        id: version
+        run: |
+          BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+          VERSION=${BRANCH_NAME#release/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Publish Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+
+          # Get the draft release
+          RELEASE_ID=$(gh release view $VERSION --json id -q .id)
+
+          # Publish the release
+          gh release edit $VERSION --draft=false
+
+          # Create or update the major version tag (v1, v2, etc.)
+          MAJOR_VERSION="v${VERSION#v*[0-9]}"
+          git tag -fa $MAJOR_VERSION -m "Update $MAJOR_VERSION to $VERSION"
+          git push origin $MAJOR_VERSION --force

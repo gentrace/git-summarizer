@@ -1,0 +1,114 @@
+name: "Git Weekly Summary Action"
+description: "Generate and send weekly summaries of code changes to Slack using OpenAI"
+author: "Gentrace"
+
+inputs:
+  openai_api_key:
+    description: "OpenAI API key for generating summaries"
+    required: true
+  slack_bot_token:
+    description: "Slack Bot Token for sending messages"
+    required: true
+  slack_channel:
+    description: "Slack channel to post the summary to"
+    required: true
+  days_to_analyze:
+    description: "Number of days of history to analyze"
+    required: false
+    default: "7"
+  model:
+    description: "OpenAI model to use for summarization"
+    required: false
+    default: "o1"
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Generate and Send Summary
+      shell: node
+      env:
+        OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+        SLACK_CHANNEL: ${{ inputs.slack_channel }}
+        DAYS_TO_ANALYZE: ${{ inputs.days_to_analyze }}
+        OPENAI_MODEL: ${{ inputs.model }}
+      run: |
+        const https = require('https');
+        const { execSync } = require('child_process');
+
+        async function makeRequest(url, options, data) {
+          return new Promise((resolve, reject) => {
+            const req = https.request(url, options, (res) => {
+              let responseData = '';
+              res.on('data', (chunk) => { responseData += chunk; });
+              res.on('end', () => resolve(JSON.parse(responseData)));
+            });
+            req.on('error', reject);
+            if (data) req.write(JSON.stringify(data));
+            req.end();
+          });
+        }
+
+        async function main() {
+          try {
+            const daysToAnalyze = process.env.DAYS_TO_ANALYZE || "7";
+            const lastWeekLog = execSync(
+              `git log --since="${daysToAnalyze} days ago" --pretty=format:"%ad | %s%n%b%n----------------------" --date=format:"%B %d, %Y"`
+            ).toString();
+
+            if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY environment variable is required');
+            if (!process.env.SLACK_BOT_TOKEN) throw new Error('SLACK_BOT_TOKEN environment variable is required');
+            if (!process.env.SLACK_CHANNEL) throw new Error('SLACK_CHANNEL environment variable is required');
+
+            // Call OpenAI API
+            const completion = await makeRequest('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                'Content-Type': 'application/json'
+              }
+            }, {
+              model: process.env.OPENAI_MODEL || 'o1',
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are a helpful assistant that summarizes git changes for Slack messages. Create a bullet-pointed list where each point starts with the commit date, ordered from oldest to newest. Group multiple related changes from the same day under the same date. For each change, analyze the commit message and try to identify which product area it affects (e.g. UI/UX, Backend API, Database, Authentication, Analytics, etc). Include your best guess about the product area in [brackets] after each change.'
+                },
+                {
+                  role: 'user',
+                  content: `Please summarize these git commits from the past ${daysToAnalyze} days:\n\n${lastWeekLog}`
+                }
+              ]
+            });
+
+            const summary = completion.choices[0].message.content;
+            console.log('Generated summary:', summary);
+
+            // Send to Slack
+            const repoUrl = execSync('git config --get remote.origin.url').toString().trim();
+            const repoName = repoUrl.split('/').pop().replace('.git', '') || 'repository';
+
+            await makeRequest('https://slack.com/api/chat.postMessage', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+                'Content-Type': 'application/json'
+              }
+            }, {
+              channel: process.env.SLACK_CHANNEL,
+              text: `*Weekly Summary for ${repoName}*\n\n${summary}`,
+              mrkdwn: true
+            });
+
+            console.log('Summary sent successfully to Slack!');
+          } catch (error) {
+            console.error('Error:', error);
+            process.exit(1);
+          }
+        }
+
+        main();
