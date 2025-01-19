@@ -35,7 +35,12 @@ runs:
     - name: Create Script
       shell: bash
       run: |
-        cat > summarize.js << 'EOL'
+        # Create temp directory that will be automatically cleaned up
+        TEMP_DIR=$(mktemp -d)
+        SCRIPT_PATH="$TEMP_DIR/summarize.cjs"
+
+        # Create the script in temp directory
+        cat > "$SCRIPT_PATH" << 'EOL'
         const https = require('https');
         const { execSync } = require('child_process');
 
@@ -118,6 +123,9 @@ runs:
         main();
         EOL
 
+        # Store the script path for the next step
+        echo "SCRIPT_PATH=$SCRIPT_PATH" >> $GITHUB_ENV
+
     - name: Generate and Send Summary
       shell: bash
       env:
@@ -126,4 +134,4 @@ runs:
         SLACK_CHANNEL: ${{ inputs.slack_channel }}
         DAYS_TO_ANALYZE: ${{ inputs.days_to_analyze }}
         OPENAI_MODEL: ${{ inputs.model }}
-      run: node summarize.js
+      run: node $SCRIPT_PATH
