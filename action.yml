@@ -85,11 +85,11 @@ runs:
               messages: [
                 {
                   role: 'system',
-                  content: 'You are a helpful assistant that summarizes git changes for Slack messages. Create a bullet-pointed list where each point starts with the commit date, ordered from oldest to newest. Group multiple related changes from the same day under the same date. For each change, analyze the commit message and try to identify which product area it affects (e.g. UI/UX, Backend API, Database, Authentication, Analytics, etc). Include your best guess about the product area in [brackets] after each change.'
+                  content: 'You are a helpful assistant that summarizes git changes for Slack messages. Create a bullet-pointed list where each point starts with the commit date, ordered from oldest to newest. Group multiple related changes from the same day under the same date. For each change, analyze the commit message and try to identify which product area it affects (e.g. UI/UX, Backend API, Database, Authentication, Analytics, etc). Include your best guess about the product area in [brackets] after each change. Focus on the main features, improvements, and fixes. Exclude any commits that start with "chore:". Format the output to look good in Slack - use • for bullet points and *bold* for dates. For any PR references like (#1234), wrap them in a hyperlink to https://github.com/gentrace/gentrace/pull/1234. After listing all changes, add a section titled "🚀 *Potential Features Released*" that provides a high-level summary of the major features and improvements that appear to have been released based on these changes.'
                 },
                 {
                   role: 'user',
-                  content: `Please summarize these git commits from the past ${daysToAnalyze} days:\n\n${lastWeekLog}`
+                  content: `Please create a Slack-formatted bullet-point summary of these git changes, including your best guess about affected product areas, with most recent changes at the end. Exclude any commits that start with "chore:". For any PR references like (#1234), wrap them in a hyperlink to https://github.com/gentrace/gentrace/pull/1234. End with a high-level summary of potential features released:\n${lastWeekLog}`
                 }
               ]
             });
