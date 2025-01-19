@@ -28,7 +28,7 @@ jobs:
         with:
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           slack_bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
-          slack_channel: "engineering" # Required - channel to post to
+          slack_channel: "C088V1U72BC" # Required - Slack channel ID
           days_to_analyze: "7" # Optional, defaults to 7
           model: "o1" # Optional, defaults to o1
 ```
@@ -39,7 +39,7 @@ jobs:
 | ----------------- | --------------------------------------- | -------- | ------- |
 | `openai_api_key`  | OpenAI API key for generating summaries | Yes      | -       |
 | `slack_bot_token` | Slack Bot Token for sending messages    | Yes      | -       |
-| `slack_channel`   | Slack channel to post the summary to    | Yes      | -       |
+| `slack_channel`   | Slack channel ID (e.g., C088V1U72BC)    | Yes      | -       |
 | `days_to_analyze` | Number of days of history to analyze    | No       | 7       |
 | `model`           | OpenAI model to use for summarization   | No       | o1      |
 
@@ -48,8 +48,9 @@ jobs:
 1. Create an OpenAI API key at https://platform.openai.com
 2. Create a Slack Bot Token at https://api.slack.com/apps
 3. Add both tokens as secrets in your GitHub repository
-4. Add the workflow file to your repository at `.github/workflows/weekly-summary.yml`
-5. Make sure your Slack bot has been invited to the target channel
+4. Get your Slack channel ID (right-click channel → Copy channel ID)
+5. Add the workflow file to your repository at `.github/workflows/weekly-summary.yml`
+6. Make sure your Slack bot has been invited to the target channel
 
 ## License
 

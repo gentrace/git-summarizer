@@ -10,7 +10,7 @@ inputs:
     description: "Slack Bot Token for sending messages"
     required: true
   slack_channel:
-    description: "Slack channel to post the summary to"
+    description: "Slack channel ID (e.g., C088V1U72BC)"
     required: true
   days_to_analyze:
     description: "Number of days of history to analyze"
@@ -28,15 +28,14 @@ runs:
       with:
         fetch-depth: 0
 
-    - name: Generate and Send Summary
-      shell: node
-      env:
-        OPENAI_API_KEY: ${{ inputs.openai_api_key }}
-        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
-        SLACK_CHANNEL: ${{ inputs.slack_channel }}
-        DAYS_TO_ANALYZE: ${{ inputs.days_to_analyze }}
-        OPENAI_MODEL: ${{ inputs.model }}
+    - uses: actions/setup-node@v3
+      with:
+        node-version: "18"
+
+    - name: Create Script
+      shell: bash
       run: |
+        cat > summarize.js << 'EOL'
         const https = require('https');
         const { execSync } = require('child_process');
 
@@ -63,6 +62,11 @@ runs:
             if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY environment variable is required');
             if (!process.env.SLACK_BOT_TOKEN) throw new Error('SLACK_BOT_TOKEN environment variable is required');
             if (!process.env.SLACK_CHANNEL) throw new Error('SLACK_CHANNEL environment variable is required');
+            
+            // Validate Slack channel ID format
+            if (!/^[A-Z0-9]{9,}$/.test(process.env.SLACK_CHANNEL)) {
+              throw new Error('SLACK_CHANNEL must be a valid Slack channel ID (e.g., C088V1U72BC)');
+            }
 
             // Call OpenAI API
             const completion = await makeRequest('https://api.openai.com/v1/chat/completions', {
@@ -112,3 +116,14 @@ runs:
         }
 
         main();
+        EOL
+
+    - name: Generate and Send Summary
+      shell: bash
+      env:
+        OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+        SLACK_CHANNEL: ${{ inputs.slack_channel }}
+        DAYS_TO_ANALYZE: ${{ inputs.days_to_analyze }}
+        OPENAI_MODEL: ${{ inputs.model }}
+      run: node summarize.js
